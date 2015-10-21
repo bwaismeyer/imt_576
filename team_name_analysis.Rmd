@@ -1,0 +1,145 @@
+---
+title: "Team Name Analysis"
+author: "Brian Waismeyer"
+date: "October 20, 2015"
+output: html_document
+---
+
+This is an analysis of Team 7's "Team Name and Logo" survey data. These data
+were collected in a highly scientific manner and can be considered an exact
+reading of the team's feelings towards different candidate names and towards
+Amanda's logo skillz.
+
+## Load Libraries and Data
+
+First off, we need to load the most powerful R packages possible - the scale
+and importance of the data is nearly beyond comprehension.
+
+```{r, results='hold', message=FALSE, warning=FALSE}
+# load crazy-powerful packages
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+```
+
+Then we need to lovingly, cautiously, and tremendously load the data.
+
+```{r, results='hold'}
+# load the data, assuming that data is in the current working directory
+team_df <- read.csv("Score the team names! (Responses) - Form Responses 1.csv",
+                    stringsAsFactors = FALSE)
+
+# ignoring the stupid formatting warning, we inspect the results
+str(team_df)
+```
+
+## Carpenter the Data
+
+The data arrives in a format as wide as yo mama and with more awkward periods.
+With calm strokes and sturdy hands, we craft the data to be lean and mean and
+clean.
+
+```{r, results='hold'}
+# rename the last two variables to be less crazy
+names(team_df)[16:17] <- c("notes", "Amanda_logo")
+
+# grab the data by the hand
+clean_df <- team_df %>%
+    # drop notes and timestamp because we don't care
+    select(-notes, -Timestamp) %>%
+    # add a person id 'cuz it's easier to deal with than the timestamps
+    mutate(person_id = row_number()) %>%
+    # flip the data from wide as #### to long
+    gather("team_name", "rating", -person_id, -Amanda_logo)
+
+# clean up all those cray-cray periods
+clean_df$team_name <- str_replace_all(clean_df$team_name, "[.]", " ")
+
+# replace double spaces with sweet, sweet space-dash-space
+clean_df$team_name <- str_replace_all(clean_df$team_name, "[ ][ ]", " - ")
+
+# ADMIRE OUR WORK
+tbl_df(clean_df)
+```
+
+## Stare Deep into the Data's Eyes
+
+We have carved ourselves a unicorn. Let's pet that unicorn and see what wishes
+it grants us. 
+
+First we check out our thoughts on team names.
+
+```{r, results='hold'}
+# get the mean/sd for each team name rating and rank the names by sexy
+clean_df %>%
+    group_by(team_name) %>%
+    summarise(mean_rating = mean(rating),
+              sd_rating = sd(rating)) %>%
+    arrange(desc(mean_rating), 
+            desc(sd_rating))
+
+# slap it into a graph BECAUSE WE CAN
+clean_df %>%
+    group_by(team_name) %>%
+    summarise(mean_rating = mean(rating),
+              sd_rating = sd(rating)) %>%
+    ggplot(aes(x = team_name, y = mean_rating)) +
+        geom_bar(stat = "identity") +
+        theme(axis.text.x=element_text(angle = -90, hjust = 0))
+```
+
+Those are some sexy thoughts for some sexy team names.
+
+Next we assess Amanda's logo skilllllllzzz.
+
+```{r, results='hold'}
+# table it
+clean_df %>%
+    group_by(Amanda_logo, person_id) %>%
+    summarise() %>%
+    summarise(answer_count = n()) %>%
+    ungroup() %>%
+    mutate(answer_prop = answer_count / sum(answer_count))
+
+# we don't need  no graph to see what we need to see
+```
+
+Mmm. It seems that Evil Amanda should be in charge of everything.
+
+Finally, we grapple with Amanda's demand for a scatterplot by plotting the
+weirdest things that come to mind.
+
+```{r, results='hold'}
+# first we plot mean rating against sd rating to see how variability changes
+# as mean ratings approach different regions of the rating range...
+# that's probably the smartest thing I've written in this whole report...
+# I'm gonna smugly congratulate myself for this all day...
+clean_df %>%
+    group_by(team_name) %>%
+    summarise(mean_rating = mean(rating),
+              sd_rating = sd(rating)) %>%
+    ggplot(aes(x = mean_rating, y = sd_rating)) +
+        geom_point() +
+        # we slap on a smoother to make it look like cool stuff is happening
+        geom_smooth()
+
+# next we assess if people who rate spandex names low rate everything low,
+# implying that spandex-repressed people are h8ters
+clean_df %>%
+    # need a column to distinguish types of team name
+    mutate(spandex_name = ifelse(grepl("Spandex", team_name),
+                                 "spandex_infused", "spandex_less")) %>%
+    # get each persons mean rating for spandex and non-spandex titles
+    group_by(person_id, spandex_name) %>%
+    summarise(mean_rating = mean(rating)) %>%
+    # spread the dataframe so that we can make points
+    spread(spandex_name, mean_rating) %>%
+    # make us a PLOT
+    ggplot(aes(x = spandex_infused, y = spandex_less)) +
+        geom_point()
+    
+```
+
+We learn that our group is pretty small to make scatterplots and Bibin is
+totally a negative-spandex-Nancy.
